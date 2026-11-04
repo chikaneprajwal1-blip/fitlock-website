@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fitlock - Device</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <h1>Fitlock</h1>
+    <a href="index.html">Log out</a>
+  </header>
+
+  <main class="page">
+    <a class="back" href="parent.html">← All devices</a>
+    <h2 id="deviceName"></h2>
+
+    <div class="tabs">
+      <button class="tab on" data-tab="screen">Screen time</button>
+      <button class="tab" data-tab="exercise">Exercise</button>
+      <button class="tab" data-tab="controls">Controls</button>
+    </div>
+
+    <div id="tabContent"></div>
+  </main>
+
+  <script src="data.js"></script>
+  <script src="device.js"></script>
+</body>
+</html>

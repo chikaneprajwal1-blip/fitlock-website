@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fitlock - Exercise counter</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .cam { position: relative; max-width: 420px; margin: 12px auto; background: #12261f; border-radius: 14px; overflow: hidden; min-height: 200px; }
+    .cam video, .cam canvas { width: 100%; display: block; transform: scaleX(-1); }
+    .cam canvas { position: absolute; inset: 0; }
+    .reps { font-size: 56px; font-weight: 800; text-align: center; color: #3b82f6; margin: 8px 0; }
+    .center { text-align: center; }
+    select { padding: 8px; border-radius: 8px; border: 1px solid #d3dce2; font-size: 15px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Fitlock</h1>
+    <a href="child.html">Back to child page</a>
+  </header>
+
+  <main class="page center">
+    <h2>Exercise counter</h2>
+    <p class="muted" id="who"></p>
+
+    <select id="ex">
+      <option value="squat">Squats</option>
+      <option value="pushup">Push-ups</option>
+      <option value="jack">Jumping jacks</option>
+    </select>
+    <button class="btn-small primary" id="start">Start camera</button>
+    <button class="btn-small" id="stop" hidden>Stop and save</button>
+
+    <div class="cam"><video id="v" playsinline muted></video><canvas id="c"></canvas></div>
+    <div class="reps" id="reps">0</div>
+    <div class="muted" id="msg">Stand back so your whole body is in view.</div>
+  </main>
+
+  <script src="data.js"></script>
+  <script type="module">
+    import { PoseLandmarker, FilesetResolver, DrawingUtils }
+      from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+
+    const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+    const MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+
+    // Which child is exercising: exercise.html?id=0
+    const deviceId = Number(new URLSearchParams(window.location.search).get("id")) || 0;
+    document.getElementById("who").textContent = "Counting for: " + deviceName(deviceId);
+
+    // The exercise names used in our data
+    const TYPE = { squat: "squats", pushup: "pushups", jack: "jacks" };
+
+    const $ = (id) => document.getElementById(id);
+    const video = $("v"), canvas = $("c"), ctx = canvas.getContext("2d");
+    let landmarker, drawer, running = false, reps = 0, stage = "up", lastTime = -1;
+
+    // Angle at point b, formed by a-b-c, in degrees
+    function angle(a, b, c) {
+      const r = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+      const d = Math.abs(r * 180 / Math.PI);
+      return d > 180 ? 360 - d : d;
+    }
+
+    // Are all these body points clearly visible?
+    const seen = (lm, ...ids) => ids.every((i) => lm[i].visibility > 0.5);
+
+    // One rep = go to the "down" position, then come back to "up"
+    function step(isDown, isUp) {
+      if (stage === "up" && isDown) stage = "down";
+      else if (stage === "down" && isUp) { stage = "up"; reps++; $("reps").textContent = reps; }
+    }
+
+    function count(lm, type) {
+      if (type === "squat" && seen(lm, 23, 24, 25, 26, 27, 28)) {
+        const k = (angle(lm[23], lm[25], lm[27]) + angle(lm[24], lm[26], lm[28])) / 2;
+        step(k < 100, k > 160);
+      } else if (type === "pushup" && seen(lm, 11, 12, 13, 14, 15, 16)) {
+        const e = (angle(lm[11], lm[13], lm[15]) + angle(lm[12], lm[14], lm[16])) / 2;
+        step(e < 90, e > 155);
+      } else if (type === "jack" && seen(lm, 11, 12, 15, 16, 27, 28)) {
+        const shoulder = Math.abs(lm[11].x - lm[12].x);
+        const feet = Math.abs(lm[27].x - lm[28].x);
+        const armsUp = lm[15].y < lm[11].y && lm[16].y < lm[12].y;
+        const armsDown = lm[15].y > lm[11].y && lm[16].y > lm[12].y;
+        step(armsUp && feet > shoulder * 1.5, armsDown && feet < shoulder * 1.2);
+      }
+    }
+
+    function loop() {
+      if (!running) return;
+      if (video.currentTime !== lastTime) {
+        lastTime = video.currentTime;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const res = landmarker.detectForVideo(video, performance.now());
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const lm = res.landmarks[0];
+        if (lm) {
+          drawer.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, { color: "#3b82f6", lineWidth: 3 });
+          drawer.drawLandmarks(lm, { color: "#f0a24a", radius: 3 });
+          count(lm, $("ex").value);
+        }
+      }
+      requestAnimationFrame(loop);
+    }
+
+    // Create the pose model. Try the graphics card first, then the CPU.
+    async function createLandmarker(files, delegate) {
+      return PoseLandmarker.createFromOptions(files, {
+        baseOptions: { modelAssetPath: MODEL, delegate: delegate },
+        runningMode: "VIDEO",
+        numPoses: 1
+      });
+    }
+
+    $("start").onclick = async () => {
+      try {
+        $("msg").textContent = "Loading the pose model...";
+        if (!landmarker) {
+          const files = await FilesetResolver.forVisionTasks(WASM);
+          try { landmarker = await createLandmarker(files, "GPU"); }
+          catch (e) { landmarker = await createLandmarker(files, "CPU"); }
+        }
+        drawer = new DrawingUtils(ctx);
+        video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+        await video.play();
+        reps = 0; stage = "up"; $("reps").textContent = 0;
+        running = true;
+        $("start").hidden = true; $("stop").hidden = false;
+        $("msg").textContent = "Counting. Start your exercise.";
+        loop();
+      } catch (e) {
+        $("msg").textContent = "Could not start. Allow the camera, and make sure you have internet.";
+      }
+    };
+
+    $("stop").onclick = () => {
+      running = false;
+      video.srcObject && video.srcObject.getTracks().forEach((t) => t.stop());
+      $("stop").hidden = true;
+
+      if (reps > 0) {
+        addRepsToDevice(deviceId, TYPE[$("ex").value], reps);   // save to the child's total
+        $("msg").textContent = "Saved " + reps + " reps. Going back...";
+        setTimeout(() => { window.location.href = "child.html?id=" + deviceId; }, 1500);
+      } else {
+        $("msg").textContent = "No reps counted, nothing saved.";
+        $("start").hidden = false;
+      }
+    };
+  </script>
+</body>
+</html>
