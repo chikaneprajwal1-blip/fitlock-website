@@ -22,7 +22,7 @@ let creating = false;   // false = log in, true = create account
 
 // If the parent is already logged in, go straight to the dashboard
 onAuthStateChanged(auth, function (user) {
-  if (user) window.location.href = "parent.html";
+   if (user && !user.isAnonymous) window.location.href = "parent.html";
 });
 
 // Switch between "Log in" and "Create an account"

@@ -41,8 +41,7 @@
   <script type="module">
     import { PoseLandmarker, FilesetResolver, DrawingUtils }
       from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
-    import { addRepsToDevice, getDeviceName } from "./store.js";
-
+    import { addRepsToDevice, getDeviceName, ensureSignedIn } from "./store.js";
     const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
     const MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
@@ -56,8 +55,9 @@
 
     if (deviceId) {
       $("backLink").href = "child.html?id=" + deviceId;
-      getDeviceName(deviceId).then((name) => { $("who").textContent = "Counting for: " + name; });
-    } else {
+      ensureSignedIn()
+        .then(() => getDeviceName(deviceId))
+        .then((name) => { $("who").textContent = "Counting for: " + name; });    } else {
       $("who").textContent = "This phone is not connected. Connect it on the child page first.";
       $("start").disabled = true;
     }

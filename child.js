@@ -1,5 +1,4 @@
-import { watchDevice, saveDevice, connectWithCode, formatTime } from "./store.js";
-
+import { watchDevice, saveDevice, connectWithCode, formatTime, ensureSignedIn } from "./store.js";
 // Which device is this phone? From the address (child.html?id=...) or from what it remembered.
 let id = new URLSearchParams(window.location.search).get("id");
 try {
@@ -123,4 +122,4 @@ document.getElementById("connectBtn").addEventListener("click", async function (
   button.disabled = false;
 });
 
-start();
+ensureSignedIn().then(start);

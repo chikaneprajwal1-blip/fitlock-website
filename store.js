@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signOut, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, doc, getDoc, setDoc, deleteDoc, query, where, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -13,7 +13,7 @@ const db = getFirestore(app);
 // Runs onReady(user) when a parent is logged in. Otherwise goes to the login page.
 export function requireParent(onReady) {
   onAuthStateChanged(auth, function (user) {
-    if (!user) {
+    if (!user || user.isAnonymous) {
       window.location.href = "login.html";
       return;
     }
@@ -155,7 +155,9 @@ export async function connectWithCode(code) {
   await setDoc(deviceRef, newDevice(pairing.name, pairing.ownerId));
   await deleteDoc(ref);   // a code works only once
   return deviceRef.id;
-}// ---------- EXERCISE ----------
+}
+
+// ---------- EXERCISE ----------
 // Add reps to a device's totals (used by the camera page)
 export async function addRepsToDevice(id, type, count) {
   try {
@@ -177,5 +179,17 @@ export async function getDeviceName(id) {
     return snap.exists() ? snap.data().name : "Unknown device";
   } catch (error) {
     return "Unknown device";
+  }
+}
+
+// ---------- CHILD PHONE SIGN-IN ----------
+// A child's phone has no email login, so it gets a hidden anonymous account.
+export async function ensureSignedIn() {
+  if (auth.currentUser) return;
+  await new Promise(function (resolve) {
+    const stop = onAuthStateChanged(auth, function () { stop(); resolve(); });
+  });
+  if (!auth.currentUser) {
+    await signInAnonymously(auth);
   }
 }
