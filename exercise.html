@@ -18,7 +18,7 @@
 
   <header>
     <h1>Fitlock</h1>
-    <a href="child.html">Back to child page</a>
+    <a href="child.html" id="backLink">Back to child page</a>
   </header>
 
   <main class="page center">
@@ -38,22 +38,33 @@
     <div class="muted" id="msg">Stand back so your whole body is in view.</div>
   </main>
 
-  <script src="data.js"></script>
   <script type="module">
     import { PoseLandmarker, FilesetResolver, DrawingUtils }
       from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+    import { addRepsToDevice, getDeviceName } from "./store.js";
 
     const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
     const MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
-    // Which child is exercising: exercise.html?id=0
-    const deviceId = Number(new URLSearchParams(window.location.search).get("id")) || 0;
-    document.getElementById("who").textContent = "Counting for: " + deviceName(deviceId);
+    // Which child is exercising: exercise.html?id=<device id>. If missing, use the one this phone remembered.
+    let deviceId = new URLSearchParams(window.location.search).get("id");
+    if (!deviceId) {
+      try { deviceId = localStorage.getItem("fitlockChildDevice"); } catch (e) {}
+    }
+
+    const $ = (id) => document.getElementById(id);
+
+    if (deviceId) {
+      $("backLink").href = "child.html?id=" + deviceId;
+      getDeviceName(deviceId).then((name) => { $("who").textContent = "Counting for: " + name; });
+    } else {
+      $("who").textContent = "This phone is not connected. Connect it on the child page first.";
+      $("start").disabled = true;
+    }
 
     // The exercise names used in our data
     const TYPE = { squat: "squats", pushup: "pushups", jack: "jacks" };
 
-    const $ = (id) => document.getElementById(id);
     const video = $("v"), canvas = $("c"), ctx = canvas.getContext("2d");
     let landmarker, drawer, running = false, reps = 0, stage = "up", lastTime = -1;
 
@@ -137,13 +148,14 @@
       }
     };
 
-    $("stop").onclick = () => {
+    $("stop").onclick = async () => {
       running = false;
       video.srcObject && video.srcObject.getTracks().forEach((t) => t.stop());
       $("stop").hidden = true;
 
       if (reps > 0) {
-        addRepsToDevice(deviceId, TYPE[$("ex").value], reps);   // save to the child's total
+        $("msg").textContent = "Saving...";
+        await addRepsToDevice(deviceId, TYPE[$("ex").value], reps);   // save to the child's total
         $("msg").textContent = "Saved " + reps + " reps. Going back...";
         setTimeout(() => { window.location.href = "child.html?id=" + deviceId; }, 1500);
       } else {

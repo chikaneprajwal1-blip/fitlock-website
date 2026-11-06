@@ -1,44 +1,46 @@
-// Which device to show: child.html?id=1, or the first one by default
-let current = Number(new URLSearchParams(window.location.search).get("id")) || 0;
-if (current >= devices.length) current = 0;
+import { watchDevice, saveDevice, connectWithCode, formatTime } from "./store.js";
+
+// Which device is this phone? From the address (child.html?id=...) or from what it remembered.
+let id = new URLSearchParams(window.location.search).get("id");
+try {
+  if (id) localStorage.setItem("fitlockChildDevice", id);
+  else id = localStorage.getItem("fitlockChildDevice");
+} catch (e) {}
+
+let device = null;
+let stopWatching = null;
 
 // Total minutes allowed = the parent's limit + the exercise bonus
-function allowedMinutes(app, device) {
+function allowedMinutes(app) {
   return app.limit + device.bonus;
 }
 
 // Is this app locked right now?
-function isLocked(app, device) {
+function isLocked(app) {
   if (app.mode === "block") return true;
-  if (app.mode === "limit" && app.usage >= allowedMinutes(app, device)) return true;
+  if (app.mode === "limit" && app.usage >= allowedMinutes(app)) return true;
   return false;
 }
 
-// Child taps a button: add reps (a demo for now)
+// Demo buttons: add reps without the camera
 function addReps(type, amount) {
-  const device = devices[current];
   device.reps[type] += amount;
   device.weekReps[6] += amount;   // today is the last day in the list
-  saveDevices();
+  saveDevice(id, device);
   render();
 }
-
-function pickDevice(value) {
-  current = Number(value);
-  render();
-}
+window.addReps = addReps;
 
 function render() {
-  const device = devices[current];
+  const phone = document.getElementById("phone");
 
-  // Device picker
-  document.getElementById("deviceSelect").innerHTML = devices.map(function (d, i) {
-    return `<option value="${i}" ${i === current ? "selected" : ""}>${d.name}</option>`;
-  }).join("");
+  if (!device) {
+    phone.innerHTML = `<p class="muted">This phone is not connected yet. Enter the code from your parent below.</p>`;
+    return;
+  }
 
-  // App list
   const appRows = device.apps.map(function (app) {
-    const locked = isLocked(app, device);
+    const locked = isLocked(app);
     let status;
 
     if (app.mode === "block") {
@@ -46,7 +48,7 @@ function render() {
     } else if (locked) {
       status = `<span class="lock-text">🔒 Time is over for today</span>`;
     } else if (app.mode === "limit") {
-      const allowed = allowedMinutes(app, device);
+      const allowed = allowedMinutes(app);
       const left = allowed - app.usage;
       const percent = Math.min(100, (app.usage / allowed) * 100);
       status = `<span class="muted">${formatTime(left)} left</span>
@@ -62,7 +64,8 @@ function render() {
 
   const total = device.reps.squats + device.reps.pushups + device.reps.jacks;
 
-  document.getElementById("phone").innerHTML = `
+  phone.innerHTML = `
+    <p class="muted" style="margin-top:0">${device.name}</p>
     <b>Apps</b>
     <div>${appRows}</div>
 
@@ -76,39 +79,48 @@ function render() {
     <button class="btn-small primary" onclick="addReps('squats', 10)">Squats +10</button>
     <button class="btn-small primary" onclick="addReps('pushups', 10)">Push-ups +10</button>
     <button class="btn-small primary" onclick="addReps('jacks', 10)">Jacks +10</button>
-    <p><a class="button" style="padding:8px 18px;font-size:15px" href="exercise.html?id=${current}">Count with the camera</a></p>
+    <p><a class="button" style="padding:8px 18px;font-size:15px" href="exercise.html?id=${id}">Count with the camera</a></p>
   `;
 }
 
-document.getElementById("deviceSelect").addEventListener("change", function (e) {
-  pickDevice(e.target.value);
-});
-
-// Connect with a pairing code
-document.getElementById("connectBtn").addEventListener("click", function () {
-  const code = document.getElementById("codeInput").value.replace(/\D/g, "");  // keep digits only
-  const codes = loadCodes();
-  const message = document.getElementById("connectMsg");
-
-  if (!codes[code]) {
-    message.textContent = "Code not found. Check it and try again.";
+// Start listening to this device. The screen updates by itself when the parent changes something.
+function start() {
+  if (stopWatching) stopWatching();
+  if (!id) {
+    device = null;
+    render();
     return;
   }
+  stopWatching = watchDevice(id, function (data) {
+    device = data;
+    render();
+  });
+}
 
-  devices.push(newDevice(codes[code]));   // add the new device
-  delete codes[code];                     // a code can only be used once
-  saveCodes(codes);
-  saveDevices();
+// Connect with a pairing code
+document.getElementById("connectBtn").addEventListener("click", async function () {
+  const code = document.getElementById("codeInput").value.replace(/\D/g, "");  // keep digits only
+  const message = document.getElementById("connectMsg");
+  const button = document.getElementById("connectBtn");
 
-  current = devices.length - 1;           // show the new device
-  document.getElementById("codeInput").value = "";
   message.textContent = "";
-  render();
+  button.disabled = true;
+
+  try {
+    const newId = await connectWithCode(code);
+    if (!newId) {
+      message.textContent = "Code not found or too old. Ask your parent for a new one.";
+    } else {
+      id = newId;
+      try { localStorage.setItem("fitlockChildDevice", id); } catch (e) {}
+      document.getElementById("codeInput").value = "";
+      start();
+    }
+  } catch (error) {
+    message.textContent = "Could not connect (" + (error.code || error.message) + ").";
+  }
+
+  button.disabled = false;
 });
 
-// If the parent changes something in another browser tab, reload to show it
-window.addEventListener("storage", function () {
-  window.location.reload();
-});
-
-render();
+start();

@@ -14,7 +14,7 @@
   </header>
 
   <main class="form-box">
-    <h2>Parent login</h2>
+    <h2 id="formTitle">Parent login</h2>
 
     <form id="loginForm">
       <label for="email">Email</label>
@@ -24,10 +24,15 @@
       <input type="password" id="password" minlength="6" required>
 
       <p id="error" class="error"></p>
-      <button type="submit" class="button">Log in</button>
+      <button type="submit" class="button" id="submitBtn">Log in</button>
     </form>
+
+    <p class="switch-text">
+      <span id="switchText">New here?</span>
+      <button type="button" class="link-btn" id="switchBtn">Create an account</button>
+    </p>
   </main>
 
-  <script src="login.js"></script>
+  <script type="module" src="login.js"></script>
 </body>
 </html>

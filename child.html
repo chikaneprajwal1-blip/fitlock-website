@@ -15,10 +15,10 @@
 
   <main class="page">
     <h2>Child device</h2>
-    <p class="muted">Showing: <select id="deviceSelect"></select></p>
     <div class="phone" id="phone"></div>
-        <div class="box connect">
-      <h3 style="margin-top:0">Connect a new device</h3>
+
+    <div class="box connect">
+      <h3 style="margin-top:0">Connect this phone</h3>
       <p class="muted">Enter the 6-digit code from the parent.</p>
       <input class="text-input" id="codeInput" inputmode="numeric" maxlength="7" placeholder="123 456">
       <button class="btn-small primary" id="connectBtn">Connect</button>
@@ -26,6 +26,6 @@
     </div>
   </main>
 
-  <script src="data.js"></script>
-  <script src="child.js"></script>
+  <script type="module" src="child.js"></script>
 </body>
+</html>

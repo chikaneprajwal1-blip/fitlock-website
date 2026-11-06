@@ -6,11 +6,14 @@
   <title>Fitlock - Parent dashboard</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="protected">
 
   <header>
     <h1>Fitlock</h1>
-    <a href="index.html">Log out</a>
+    <div>
+      <span id="userEmail" class="who"></span>
+      <a href="#" id="logout">Log out</a>
+    </div>
   </header>
 
   <main class="page">
@@ -33,14 +36,17 @@
 
     <h3>Your children's devices</h3>
     <div id="deviceList" class="device-list"></div>
-     <h3>Add a child device</h3>
+
+    <h3>Add a child device</h3>
     <div class="box">
       <input class="text-input" id="childName" placeholder="Child's name or device (e.g. Riya's phone)">
       <button class="btn-small primary" id="createCode">Create pairing code</button>
       <div id="codeResult"></div>
     </div>
-</main>
-  <script src="data.js"></script>
-  <script src="parent.js"></script>
+
+    <p><button class="btn-small" id="addSamples">Add 2 sample devices (for demo)</button></p>
+  </main>
+
+  <script type="module" src="parent.js"></script>
 </body>
 </html>

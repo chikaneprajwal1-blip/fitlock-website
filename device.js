@@ -1,10 +1,15 @@
-// Read the device number from the address, e.g. device.html?id=1
-const params = new URLSearchParams(window.location.search);
-const id = Number(params.get("id"));
-const device = devices[id];
+import { requireParent, watchDevice, saveDevice, formatTime } from "./store.js";
 
+const id = new URLSearchParams(window.location.search).get("id");
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const content = document.getElementById("tabContent");
+
+let device = null;     // the device's data, kept up to date by the database
+let tab = "screen";    // which tab is open
+
+function save() {
+  saveDevice(id, device);
+}
 
 // ---------- SCREEN TIME TAB ----------
 function showScreenTime() {
@@ -13,7 +18,8 @@ function showScreenTime() {
 
   const weekTotal = device.weekMins.reduce(function (a, b) { return a + b; }, 0);
   const average = Math.round(weekTotal / 7);
-    const highest = Math.max(...device.weekMins, 1);
+  const highest = Math.max(...device.weekMins, 1);
+
   const bars = device.weekMins.map(function (mins, i) {
     return `<div class="bar-col">
       <div class="bar-fill" style="height:${(mins / highest) * 100}%"></div>
@@ -48,11 +54,10 @@ function showScreenTime() {
   `;
 }
 
-// Allow or block an app from the Screen time tab
 function setMode(appIndex, mode) {
   device.apps[appIndex].mode = mode;
-  saveDevices();
-  showScreenTime();
+  save();
+  showTab(tab);
 }
 
 // ---------- EXERCISE TAB ----------
@@ -112,21 +117,21 @@ function showExercise() {
 
 function giveBonus(minutes) {
   device.bonus += minutes;
-  saveDevices();
-  showExercise();
+  save();
+  showTab(tab);
 }
 
 function resetBonus() {
   device.bonus = 0;
-  saveDevices();
-  showExercise();
+  save();
+  showTab(tab);
 }
 
 function acceptSuggestion() {
   device.bonus += suggestedBonus();
   device.rewarded = totalReps();   // these reps now count as rewarded
-  saveDevices();
-  showExercise();
+  save();
+  showTab(tab);
 }
 
 // ---------- CONTROLS TAB ----------
@@ -163,27 +168,26 @@ function showControls() {
   `;
 }
 
-// Change an app to Free, Limit or Block
 function setAppMode(appIndex, mode) {
   const app = device.apps[appIndex];
   app.mode = mode;
   if (mode === "limit" && app.limit < 15) {
     app.limit = 60;   // a new limit starts at 1 hour
   }
-  saveDevices();
-  showControls();
+  save();
+  showTab(tab);
 }
 
-// Add or remove minutes from an app's limit
 function changeLimit(appIndex, change) {
   const app = device.apps[appIndex];
   app.limit = Math.min(480, Math.max(15, app.limit + change));  // keep it between 15 and 480
-  saveDevices();
-  showControls();
+  save();
+  showTab(tab);
 }
 
 // ---------- TABS ----------
 function showTab(name) {
+  tab = name;
   document.querySelectorAll(".tab").forEach(function (button) {
     button.classList.toggle("on", button.dataset.tab === name);
   });
@@ -193,13 +197,34 @@ function showTab(name) {
   if (name === "controls") showControls();
 }
 
+// The buttons in the HTML above call these by name, so we put them on "window"
+Object.assign(window, {
+  setMode, giveBonus, resetBonus, acceptSuggestion, setAppMode, changeLimit
+});
+
 // ---------- START THE PAGE ----------
-if (!device) {
-  content.textContent = "Device not found.";
-} else {
-  document.getElementById("deviceName").textContent = device.name;
+requireParent(function () {
+  if (!id) {
+    content.textContent = "Device not found.";
+    return;
+  }
+
+  document.getElementById("childLink").href = "child.html?id=" + id;
+
   document.querySelectorAll(".tab").forEach(function (button) {
-    button.addEventListener("click", function () { showTab(button.dataset.tab); });
+    button.addEventListener("click", function () {
+      if (device) showTab(button.dataset.tab);
+    });
   });
-  showTab("screen");
-}
+
+  // Runs now, and again every time this device changes in the database
+  watchDevice(id, function (data) {
+    if (!data) {
+      content.textContent = "Device not found.";
+      return;
+    }
+    device = data;
+    document.getElementById("deviceName").textContent = device.name;
+    showTab(tab);
+  });
+});

@@ -6,16 +6,20 @@
   <title>Fitlock - Device</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="protected">
 
   <header>
     <h1>Fitlock</h1>
-    <a href="index.html">Log out</a>
+    <div>
+      <span id="userEmail" class="who"></span>
+      <a href="#" id="logout">Log out</a>
+    </div>
   </header>
 
   <main class="page">
     <a class="back" href="parent.html">← All devices</a>
     <h2 id="deviceName"></h2>
+    <p><a class="back" id="childLink" href="#">Open this child's view →</a></p>
 
     <div class="tabs">
       <button class="tab on" data-tab="screen">Screen time</button>
@@ -26,7 +30,6 @@
     <div id="tabContent"></div>
   </main>
 
-  <script src="data.js"></script>
-  <script src="device.js"></script>
+  <script type="module" src="device.js"></script>
 </body>
 </html>

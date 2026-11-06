@@ -337,4 +337,27 @@ header a { color: white; }
 .connect {
   max-width: 400px;
   margin: 20px auto 0;
+}.switch-text {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+  color: #6b7b86;
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  color: #3b82f6;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  text-decoration: underline;
+}/* Hide protected pages until we know the parent is logged in */
+body.protected { visibility: hidden; }
+body.protected.ready { visibility: visible; }
+
+.who {
+  font-size: 13px;
+  margin-right: 14px;
+  opacity: 0.9;
 }
